@@ -5,48 +5,33 @@ on:
       - 'v*'
 
 jobs:
-  publish-tauri:
-    permissions:
-      contents: write
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
-          - platform: macos-latest
-            args: '--target x86_64-apple-darwin'
-          - platform: ubuntu-latest
-            args: ''
-          - platform: windows-latest
-            args: ''
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
 
-    runs-on: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: latest
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install pnpm
+        run: npm install -g pnpm@10.32.1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
-
+          targets: ${{ matrix.target }}
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -54,17 +39,29 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             patchelf
-
-      - name: Install frontend dependencies
+      - name: Install dependencies
         run: pnpm install
-
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        run: pnpm tauri build --target ${{ matrix.target }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: 'v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+          name: ${{ matrix.target }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/**
+          if-no-files-found: error
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: '*'
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**
+          generate_release_notes: true
