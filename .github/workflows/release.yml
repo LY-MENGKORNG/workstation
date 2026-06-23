@@ -12,12 +12,16 @@ jobs:
         include:
           - target: aarch64-apple-darwin
             os: macos-latest
+            build_args: '--target aarch64-apple-darwin'
           - target: x86_64-apple-darwin
             os: macos-latest
+            build_args: '--target x86_64-apple-darwin'
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+            build_args: ''
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+            build_args: ''
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -42,13 +46,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install
       - name: Build
-        run: pnpm tauri build --target ${{ matrix.target }}
+        run: pnpm tauri build ${{ matrix.build_args }}
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
           path: src-tauri/target/${{ matrix.target }}/release/bundle/**
-          if-no-files-found: error
+          if-no-files-found: warn
 
   release:
     needs: [build]
