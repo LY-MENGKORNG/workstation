@@ -4,7 +4,7 @@
 	import HomeIcon from "@lucide/svelte/icons/house";
 	import TerminalIcon from "@lucide/svelte/icons/terminal";
 	import GitBranchIcon from "@lucide/svelte/icons/git-branch";
-	import ModeToggle from "./ModeToggle.svelte";
+	import ModeToggle from "$lib/components/ModeToggle.svelte";
 
 	const navItems = [
 		{ title: "Home", url: "/", icon: HomeIcon },
