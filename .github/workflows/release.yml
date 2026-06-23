@@ -20,7 +20,7 @@ jobs:
             build_args: '--target x86_64-apple-darwin'
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            build_args: ''
+            build_args: '--target x86_64-unknown-linux-gnu'
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             build_args: ''
@@ -48,21 +48,36 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev
+            patchelf
 
       - name: Install dependencies
         run: pnpm install
 
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        run: pnpm tauri build ${{ matrix.build_args }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: 'v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.build_args }}
+          name: workstation-${{ matrix.target }}
+          path: |
+            src-tauri/target/release/bundle/**
+          if-no-files-found: warn
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: v${{ github.ref_name }}
+          body: See the assets below to download this version and install.
+          draft: true
+          files: artifacts/**/*
